@@ -1,0 +1,62 @@
+name: Build Real iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Compile Swift Code to ARM64 iOS Binary
+        run: |
+          # Detecta se os arquivos estão na pasta GalaxyFit3Link ou na raiz
+          if [ -d "GalaxyFit3Link" ]; then
+            cd GalaxyFit3Link
+          fi
+          
+          echo "Compilando binário nativo ARM64 para iPhone 14 Pro..."
+          xcrun --sdk iphoneos swiftc \
+            -target arm64-apple-ios16.0 \
+            -O \
+            -framework UIKit \
+            -framework SwiftUI \
+            -framework CoreBluetooth \
+            -framework Foundation \
+            GalaxyFit3LinkApp.swift BluetoothManager.swift ContentView.swift \
+            -o GalaxyFit3Link
+          
+          echo "Executável gerado com sucesso:"
+          file GalaxyFit3Link
+
+      - name: Package Signed-Ready IPA
+        run: |
+          mkdir -p Payload/GalaxyFit3Link.app
+          
+          # Localiza os arquivos compilados
+          if [ -f "GalaxyFit3Link/GalaxyFit3Link" ]; then
+            cp GalaxyFit3Link/GalaxyFit3Link Payload/GalaxyFit3Link.app/
+            cp GalaxyFit3Link/Info.plist Payload/GalaxyFit3Link.app/
+          else
+            cp GalaxyFit3Link Payload/GalaxyFit3Link.app/
+            cp Info.plist Payload/GalaxyFit3Link.app/
+          fi
+          
+          chmod +x Payload/GalaxyFit3Link.app/GalaxyFit3Link
+          printf "APPL????" > Payload/GalaxyFit3Link.app/PkgInfo
+          
+          # Compacta em formato .ipa
+          zip -r -9 GalaxyFit3Link.ipa Payload
+          echo "IPA pronto para Sideloadly!"
+          ls -lh GalaxyFit3Link.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GalaxyFit3Link-IPA
+          path: GalaxyFit3Link.ipa
+          retention-days: 7
